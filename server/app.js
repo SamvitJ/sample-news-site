@@ -33,19 +33,20 @@ app.listen(app.get('port'), function () {
 app.get('/', function(req, res) {
     var transactionId = req.headers['transaction-id'];
     var clientId = req.headers['client-id'] || uuid.v4();
+    var articleId = "5dK382jd9";
     if (transactionId) {
         Transaction.find({'_id': transactionId}, function(findErr, docs) {
             if (findErr) {
-                writePreview(res, clientId);
+                writePreview(res, articleId, clientId);
                 throw findErr;
             } else if (docs.length) {
                 console.log("Found transaction: " + docs);
-                writeFull(res, clientId);
+                writeFull(res, articleId, clientId);
             } else {
                 console.log("Saving new transaction");
-                writeFull(res, clientId);
+                writeFull(res, articleId, clientId);
 
-                var newTx = new Transaction({'_id': transactionId, 'clientId': clientId, 'articleId': '1'});
+                var newTx = new Transaction({'_id': transactionId, 'clientId': clientId, 'articleId': articleId});
                 newTx.save(function (saveErr) {
                     if (saveErr) {
                         throw saveErr;
@@ -56,15 +57,15 @@ app.get('/', function(req, res) {
             }
         });
     } else {
-        writePreview(res, clientId);
+        writePreview(res, articleId, clientId);
     }
 });
 
-function writePreview(res, clientId) {
+function writePreview(res, articleId, clientId) {
     fs.readFile('./index.html', function(err, html) {
         if (!err) {
             res.writeHead(200, {
-                'X-Article-Id': '5dK382jd9',
+                'X-Article-Id': articleId,
                 'X-Purchase-Price': '0.30',
                 'Set-Cookie': "client-id=" + clientId
             });
@@ -76,11 +77,11 @@ function writePreview(res, clientId) {
     });
 }
 
-function writeFull(res, clientId) {
+function writeFull(res, articleId, clientId) {
     fs.readFile('./index-full.html', function(err, html) {
         if (!err) {
             res.writeHead(200, {
-                'X-Article-Id': '5dK382jd9',
+                'X-Article-Id': articleId,
                 'X-Purchase-Price': '0.30',
                 'Set-Cookie': "client-id=" + clientId
             });
