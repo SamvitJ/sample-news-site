@@ -9,6 +9,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "express": "^4.13.4"
+    "express": "^4.13.4",
+    "mongoose": "^4.7.5",
+    "node-uuid": "^1.4.7"
   }
 }
