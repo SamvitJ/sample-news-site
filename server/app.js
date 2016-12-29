@@ -31,28 +31,38 @@ app.listen(app.get('port'), function () {
 
 // handlers
 app.get('/', function(req, res) {
-    fs.readFile('./index.html', function(err, html) {
-        if (!err) {
-            var transactionId = req.headers['transaction-id'];
-            var clientId = req.headers['client-id'] || uuid.v4();
-            if (transactionId) {
-                Transaction.find({'_id': transactionId}, function(findErr, docs) {
-                    if (findErr) {
-                        throw findErr;
-                    } else if (docs.length) {
-                        console.log("Found transaction: " + docs);
+    var transactionId = req.headers['transaction-id'];
+    var clientId = req.headers['client-id'] || uuid.v4();
+    if (transactionId) {
+        Transaction.find({'_id': transactionId}, function(findErr, docs) {
+            if (findErr) {
+                writePreview(res, clientId);
+                throw findErr;
+            } else if (docs.length) {
+                console.log("Found transaction: " + docs);
+                writeFull(res, clientId);
+            } else {
+                console.log("Saving new transaction");
+                writeFull(res, clientId);
+
+                var newTx = new Transaction({'_id': transactionId, 'clientId': clientId, 'articleId': '1'});
+                newTx.save(function (saveErr) {
+                    if (saveErr) {
+                        throw saveErr;
                     } else {
-                        var newTx = new Transaction({'_id': transactionId, 'clientId': clientId, 'articleId': '1'});
-                        newTx.save(function (saveErr) {
-                            if (saveErr) {
-                                throw saveErr;
-                            } else {
-                                console.log("Saved transaction");
-                            }
-                        });
+                        console.log("Saved transaction");
                     }
                 });
             }
+        });
+    } else {
+        writePreview(res, clientId);
+    }
+});
+
+function writePreview(res, clientId) {
+    fs.readFile('./index.html', function(err, html) {
+        if (!err) {
             res.writeHead(200, {
                 'X-Article-Id': '5dK382jd9',
                 'X-Purchase-Price': '0.30',
@@ -60,9 +70,27 @@ app.get('/', function(req, res) {
             });
             res.write(html);
             res.end();
+        } else {
+            console.log("Error loading index.html\n");
         }
     });
-});
+}
+
+function writeFull(res, clientId) {
+    fs.readFile('./index-full.html', function(err, html) {
+        if (!err) {
+            res.writeHead(200, {
+                'X-Article-Id': '5dK382jd9',
+                'X-Purchase-Price': '0.30',
+                'Set-Cookie': "client-id=" + clientId
+            });
+            res.write(html);
+            res.end();
+        } else {
+            console.log("Error loading index-full.html\n");
+        }
+    });
+}
 
 app.use('/', express.static(path.join(__dirname, '../')));
 app.use('/', express.static(path.join(__dirname, '../css')));
