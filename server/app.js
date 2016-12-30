@@ -43,17 +43,55 @@ app.get('/', function(req, res) {
                 console.log("Found transaction: " + docs);
                 writeFull(res, articleId, clientId);
             } else {
-                console.log("Saving new transaction");
-                writeFull(res, articleId, clientId);
-
-                var newTx = new Transaction({'_id': transactionId, 'clientId': clientId, 'articleId': articleId});
-                newTx.save(function (saveErr) {
-                    if (saveErr) {
-                        throw saveErr;
-                    } else {
-                        console.log("Saved transaction");
-                    }
+                // verify payment
+                var https = require('https');
+                var querystring = require('querystring');
+                var data = querystring.stringify({
+                    "payKey": transactionId,
+                    "requestEnvelope.errorLanguage": "en_US"
                 });
+                var options = {
+                    method: "POST",
+                    host: "svcs.sandbox.paypal.com",
+                    path: "/AdaptivePayments/PaymentDetails",
+                    headers: {
+                        "Content-Type": "application/x-www-form-urlencoded",
+                        "Content-Length": Buffer.byteLength(data, 'utf8'),
+                        "X-PAYPAL-SECURITY-USERID": "samvit.jain_api1.gmail.com",
+                        "X-PAYPAL-SECURITY-PASSWORD": "VJL2NXNEZXFQY3CB",
+                        "X-PAYPAL-SECURITY-SIGNATURE": "An5ns1Kso7MWUdW4ErQKJJJ4qi4-AVGcZQd33mPK.B0RMlCTgGYW-gOk",
+                        "X-PAYPAL-REQUEST-DATA-FORMAT": "NV",
+                        "X-PAYPAL-RESPONSE-DATA-FORMAT": "JSON",
+                        "X-PAYPAL-APPLICATION-ID": "APP-80W284485P519543T"
+                    }
+                }
+                var request = https.request(options, function(response) {
+                    console.log('PayPal POST /PaymentDetails status code: ', response.statusCode);
+                    response.on('data', function(chunk) {
+                        console.log('PayPal POST /PaymentDetails response: ' + chunk);
+                        var ack = JSON.parse(chunk)['responseEnvelope']['ack'];
+                        console.log('Ack: ' + ack);
+                        if (ack == "Success") {
+                            console.log("Verified payment! - saving new transaction");
+                            writeFull(res, articleId, clientId);
+
+                            var newTx = new Transaction({'_id': transactionId, 'clientId': clientId, 'articleId': articleId});
+                            newTx.save(function (saveErr) {
+                                if (saveErr) {
+                                    throw saveErr;
+                                } else {
+                                    console.log("Saved transaction");
+                                }
+                            });
+                        } else {
+                            console.log("Error verifying payment");
+                            writePreview(res, articleId, clientId);
+                        }
+                    });
+                });
+
+                request.write(data);
+                request.end();
             }
         });
     } else {
