@@ -105,6 +105,7 @@ function writePreview(res, articleId, clientId) {
             res.writeHead(200, {
                 'X-Article-Id': articleId,
                 'X-Purchase-Price': '0.30',
+                'X-Recipient': 'samvitj@princeton.edu',
                 'Set-Cookie': "client-id=" + clientId
             });
             res.write(html);
@@ -121,6 +122,7 @@ function writeFull(res, articleId, clientId) {
             res.writeHead(200, {
                 'X-Article-Id': articleId,
                 'X-Purchase-Price': '0.30',
+                'X-Recipient': 'samvitj@princeton.edu',
                 'Set-Cookie': "client-id=" + clientId
             });
             res.write(html);
