@@ -31,85 +31,86 @@ app.listen(app.get('port'), function () {
 
 // handlers
 app.get('/', function(req, res) {
-    var transactionId = req.headers['transaction-id'];
-    var clientId = req.headers['client-id'] || uuid.v4();
+    var userTxId = req.headers['transaction-id'];
+
     var articleId = "5dK382jd9";
-    if (transactionId) {
-        Transaction.find({'_id': transactionId}, function(findErr, docs) {
-            if (findErr) {
-                writePreview(res, articleId, clientId);
-                throw findErr;
-            } else if (docs.length) {
-                console.log("Found transaction: " + docs);
-                writeFull(res, articleId, clientId);
-            } else {
-                // verify payment
-                var https = require('https');
-                var querystring = require('querystring');
-                var data = querystring.stringify({
-                    "payKey": transactionId,
-                    "requestEnvelope.errorLanguage": "en_US"
-                });
-                var options = {
-                    method: "POST",
-                    host: "svcs.sandbox.paypal.com",
-                    path: "/AdaptivePayments/PaymentDetails",
-                    headers: {
-                        "Content-Type": "application/x-www-form-urlencoded",
-                        "Content-Length": Buffer.byteLength(data, 'utf8'),
-                        "X-PAYPAL-SECURITY-USERID": "samvit.jain_api1.gmail.com",
-                        "X-PAYPAL-SECURITY-PASSWORD": "VJL2NXNEZXFQY3CB",
-                        "X-PAYPAL-SECURITY-SIGNATURE": "An5ns1Kso7MWUdW4ErQKJJJ4qi4-AVGcZQd33mPK.B0RMlCTgGYW-gOk",
-                        "X-PAYPAL-REQUEST-DATA-FORMAT": "NV",
-                        "X-PAYPAL-RESPONSE-DATA-FORMAT": "JSON",
-                        "X-PAYPAL-APPLICATION-ID": "APP-80W284485P519543T"
-                    }
-                }
-                var request = https.request(options, function(response) {
-                    console.log('PayPal POST /PaymentDetails status code: ', response.statusCode);
-                    response.on('data', function(chunk) {
-                        console.log('PayPal POST /PaymentDetails response: ' + chunk);
-                        var ack = JSON.parse(chunk)['responseEnvelope']['ack'];
-                        console.log('Ack: ' + ack);
-                        if (ack == "Success") {
-                            console.log("Verified payment! - saving new transaction");
-                            writeFull(res, articleId, clientId);
+    var price = "0.30";
+    var requestId = uuid.v4();
 
-                            var newTx = new Transaction({'_id': transactionId, 'clientId': clientId, 'articleId': articleId});
-                            newTx.save(function (saveErr) {
-                                if (saveErr) {
-                                    throw saveErr;
-                                } else {
-                                    console.log("Saved transaction");
-                                }
-                            });
-                        } else {
-                            console.log("Error verifying payment");
-                            writePreview(res, articleId, clientId);
-                        }
-                    });
-                });
+    // check if user supplied a tx-id
+    if (!userTxId) {
+        writePreview(res, price, articleId, requestId);
 
-                request.write(data);
-                request.end();
-            }
-        });
     } else {
-        writePreview(res, articleId, clientId);
+        var userReqId = req.headers['request-id'];
+        var userSig;
+        var userCert;
+
+        // verify payment
+        var https = require('https');
+        var querystring = require('querystring');
+        var data = querystring.stringify({
+            "payKey": userTxId,
+            "requestEnvelope.errorLanguage": "en_US"
+        });
+        var options = {
+            method: "POST",
+            host: "svcs.sandbox.paypal.com",
+            path: "/AdaptivePayments/PaymentDetails",
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Content-Length": Buffer.byteLength(data, 'utf8'),
+                "X-PAYPAL-SECURITY-USERID": "samvit.jain_api1.gmail.com",
+                "X-PAYPAL-SECURITY-PASSWORD": "VJL2NXNEZXFQY3CB",
+                "X-PAYPAL-SECURITY-SIGNATURE": "An5ns1Kso7MWUdW4ErQKJJJ4qi4-AVGcZQd33mPK.B0RMlCTgGYW-gOk",
+                "X-PAYPAL-REQUEST-DATA-FORMAT": "NV",
+                "X-PAYPAL-RESPONSE-DATA-FORMAT": "JSON",
+                "X-PAYPAL-APPLICATION-ID": "APP-80W284485P519543T"
+            }
+        }
+        var request = https.request(options, function(response) {
+            console.log('/PaymentDetails status code: ', response.statusCode);
+
+            response.on('data', function(chunk) {
+                console.log('/PaymentDetails response: ' + chunk);
+                var parsedResp = JSON.parse(chunk);
+
+                if (parsedResp['responseEnvelope']['ack'] == "Success") {
+                    console.log("Found transaction in PayPal");
+                    var storedUserId = parsedResp['senderEmail'];
+                    var storedArticleId = parsedResp['memo'];
+                    var storedPrice = parsedResp['paymentInfoList']['paymentInfo'][0]['receiver']['amount'];
+                    console.log('paypal fields:', storedUserId, storedArticleId, storedPrice);
+
+                    // validate user request
+                    if (price == storedPrice && articleId == storedArticleId) {
+                        console.log("Validated user request!");
+                        writeFull(res);
+                    } else {
+                        console.log("Error validating request");
+                        writePreview(res, price, articleId, requestId);
+                    }
+                } else {
+                    console.log("Error verifying payment");
+                    writePreview(res, price, articleId, requestId);
+                }
+            });
+        });
+
+        request.write(data);
+        request.end();
     }
 });
 
-function writePreview(res, articleId, clientId) {
+function writePreview(res, price, articleId, requestId) {
     fs.readFile('./index.html', function(err, html) {
         if (!err) {
-            var requestId = uuid.v4();
             res.writeHead(200, {
                 'Connection': 'keep-alive',
                 'X-Article-Id': articleId,
-                'X-Purchase-Price': '0.30',
+                'X-Purchase-Price': price,
                 'X-Recipient': 'samvitj@princeton.edu',
                 'X-Request-Id': requestId
-                //'Set-Cookie': "client-id=" + clientId
             });
             res.write(html);
             res.end();
@@ -119,7 +120,7 @@ function writePreview(res, articleId, clientId) {
     });
 }
 
-function writeFull(res, articleId, clientId) {
+function writeFull(res) {
     fs.readFile('./index-full.html', function(err, html) {
         if (!err) {
             res.write(html);
