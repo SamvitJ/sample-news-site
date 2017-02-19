@@ -102,11 +102,14 @@ app.get('/', function(req, res) {
 function writePreview(res, articleId, clientId) {
     fs.readFile('./index.html', function(err, html) {
         if (!err) {
+            var requestId = uuid.v4();
             res.writeHead(200, {
+                'Connection': 'keep-alive',
                 'X-Article-Id': articleId,
                 'X-Purchase-Price': '0.30',
                 'X-Recipient': 'samvitj@princeton.edu',
-                'Set-Cookie': "client-id=" + clientId
+                'X-Request-Id': requestId
+                //'Set-Cookie': "client-id=" + clientId
             });
             res.write(html);
             res.end();
@@ -119,12 +122,6 @@ function writePreview(res, articleId, clientId) {
 function writeFull(res, articleId, clientId) {
     fs.readFile('./index-full.html', function(err, html) {
         if (!err) {
-            res.writeHead(200, {
-                'X-Article-Id': articleId,
-                'X-Purchase-Price': '0.30',
-                'X-Recipient': 'samvitj@princeton.edu',
-                'Set-Cookie': "client-id=" + clientId
-            });
             res.write(html);
             res.end();
         } else {
