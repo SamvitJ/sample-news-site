@@ -30,12 +30,21 @@ app.listen(app.get('port'), function () {
 });
 
 // handlers
+var clients = {};
 app.get('/', function(req, res) {
     var userTxId = req.headers['transaction-id'];
 
     var articleId = "5dK382jd9";
     var price = "0.30";
-    var requestId = uuid.v4();
+
+    var ipAddr = req.connection.remoteAddress
+    if (!clients[ipAddr]) {
+        clients[ipAddr] = uuid.v4();
+        console.log("Assigned request id: ", clients[ipAddr]);
+    } else {
+        console.log("Found request id: ", clients[ipAddr]);
+    }
+    var requestId = clients[ipAddr];
 
     // check if user supplied a tx-id
     if (!userTxId) {
@@ -80,10 +89,11 @@ app.get('/', function(req, res) {
                     var storedUserId = parsedResp['senderEmail'];
                     var storedArticleId = parsedResp['memo'];
                     var storedPrice = parsedResp['paymentInfoList']['paymentInfo'][0]['receiver']['amount'];
-                    console.log('paypal fields:', storedUserId, storedArticleId, storedPrice);
+                    console.log('Fields (to be verified):', storedUserId, storedArticleId, storedPrice, userReqId);
 
                     // validate user request
-                    if (price == storedPrice && articleId == storedArticleId) {
+                    if (price == storedPrice && articleId == storedArticleId
+                        && requestId == userReqId) {
                         console.log("Validated user request!");
                         writeFull(res);
                     } else {
