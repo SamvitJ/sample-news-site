@@ -37,6 +37,12 @@ app.get('/', function(req, res) {
     var articleId = "5dK382jd9";
     var price = "0.30";
 
+    console.log("Fd: ", req.socket._handle.fd);
+    // console.log("Timeout: ", req.socket.server.timeout);
+    // console.log("Handle: ", req.socket.server._handle);
+    // console.log("Fd (server): ", req.socket.server._handle.fd);
+    // console.log("Sockname: ", req.socket._sockname);
+
     var ipAddr = req.connection.remoteAddress
     if (!clients[ipAddr]) {
         clients[ipAddr] = uuid.v4();
